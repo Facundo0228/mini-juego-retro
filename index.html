@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mini Juego Retro</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Courier New', monospace;
+      background-color: #1a1a1a;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    header {
+      padding: 1rem;
+      background: #111;
+      width: 100%;
+      text-align: center;
+    }
+    nav a {
+      margin: 0 1rem;
+      color: #0ff;
+      text-decoration: none;
+    }
+    main {
+      max-width: 800px;
+      padding: 2rem;
+      text-align: center;
+    }
+    canvas {
+      border: 2px solid #0ff;
+      background-color: #222;
+    }
+    button {
+      margin-top: 1rem;
+      padding: 0.5rem 1rem;
+      font-size: 1rem;
+      background-color: #0ff;
+      border: none;
+      cursor: pointer;
+    }
+    .score {
+      margin-top: 1rem;
+      font-size: 1.2rem;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Mini Juego Retro</h1>
+    <nav>
+      <a href="#juego">Jugar</a>
+      <a href="#acerca">Acerca del juego</a>
+      <a href="#descarga">Descargar</a>
+    </nav>
+  </header>
+
+  <main>
+    <section id="juego">
+      <h2>Jugar</h2>
+      <canvas id="gameCanvas" width="640" height="360"></canvas>
+      <div class="score">Puntuación: <span id="score">0</span> | Nivel: <span id="level">1</span></div>
+      <button onclick="resetGame()">Reiniciar</button>
+    </section>
+
+    <section id="acerca">
+      <h2>Acerca del Juego</h2>
+      <p>Inspirado en el clásico Mario Bros, este juego retro-minimalista te permite jugar como un personaje pixelado que debe esquivar barriles y piedras y derrotar caracoles enemigos. ¡Llega al final del nivel y supera tu puntuación anterior!</p>
+    </section>
+
+    <section id="descarga">
+      <h2>Descargar el Juego</h2>
+      <p><a href="#">Haz clic aquí para descargar la versión offline</a> (próximamente).</p>
+    </section>
+  </main>
+
+  <script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    let score = parseInt(localStorage.getItem('puntuacion')) || 0;
+    let level = 1;
+    const maxLevel = 5;
+    document.getElementById('score').textContent = score;
+    document.getElementById('level').textContent = level;
+
+    const groundY = 300;
+    let player = { x: 50, y: groundY, width: 20, height: 30, vy: 0, grounded: true };
+    let gravity = 0.5;
+    let keys = {};
+    let flashTimer = 0;
+
+    let baseSpeed = 2;
+    let baseEnemySpeed = 1;
+
+    let obstacles = [
+      { x: 400, y: groundY, width: 20, height: 20, type: 'barril' },
+      { x: 550, y: groundY, width: 20, height: 20, type: 'piedra' }
+    ];
+
+    let enemies = [
+      { x: 300, y: groundY, width: 20, height: 20, type: 'caracol', vx: -baseEnemySpeed }
+    ];
+
+    function drawPlayer() {
+      if (flashTimer % 10 < 5) {
+        ctx.fillStyle = '#ff0';
+        ctx.fillRect(player.x, player.y, player.width, player.height);
+      }
+    }
+
+    function drawObstacles() {
+      ctx.fillStyle = '#888';
+      obstacles.forEach(o => {
+        ctx.fillRect(o.x, o.y, o.width, o.height);
+        o.x -= baseSpeed + level * 0.5;
+        if (o.x + o.width < 0) o.x = canvas.width + Math.random() * 300;
+      });
+    }
+
+    function drawEnemies() {
+      ctx.fillStyle = '#f00';
+      enemies.forEach(e => {
+        ctx.fillRect(e.x, e.y, e.width, e.height);
+        e.x += e.vx - level * 0.3;
+        if (e.x + e.width < 0) e.x = canvas.width + Math.random() * 400;
+      });
+    }
+
+    function checkCollision(a, b) {
+      return (
+        a.x < b.x + b.width &&
+        a.x + a.width > b.x &&
+        a.y < b.y + b.height &&
+        a.y + a.height > b.y
+      );
+    }
+
+    function update() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      if (keys['ArrowRight']) player.x += 3;
+      if (keys['ArrowLeft']) player.x -= 3;
+
+      if (!player.grounded) {
+        player.vy += gravity;
+        player.y += player.vy;
+        if (player.y >= groundY) {
+          player.y = groundY;
+          player.vy = 0;
+          player.grounded = true;
+        }
+      }
+
+      drawPlayer();
+      drawObstacles();
+      drawEnemies();
+
+      if (flashTimer > 0) flashTimer--;
+
+      obstacles.forEach(obs => {
+        if (checkCollision(player, obs)) {
+          flashTimer = 20;
+          alert("¡Has chocado con un obstáculo!");
+          resetGame();
+        }
+      });
+
+      enemies.forEach(enemy => {
+        if (checkCollision(player, enemy)) {
+          score += 10;
+          document.getElementById('score').textContent = score;
+          localStorage.setItem('puntuacion', score);
+          enemy.x = canvas.width + Math.random() * 400;
+
+          if (score % 50 === 0 && level < 5) {
+            level++;
+            document.getElementById('level').textContent = level;
+          }
+        }
+      });
+
+      requestAnimationFrame(update);
+    }
+
+    function resetGame() {
+      player.x = 50;
+      player.y = groundY;
+      score = 0;
+      level = 1;
+      document.getElementById('score').textContent = score;
+      document.getElementById('level').textContent = level;
+      localStorage.setItem('puntuacion', score);
+      enemies.forEach(e => e.x = canvas.width + Math.random() * 300);
+      obstacles.forEach(o => o.x = canvas.width + Math.random() * 300);
+    }
+
+    document.addEventListener('keydown', (e) => {
+      keys[e.key] = true;
+      if (e.key === ' ' && player.grounded) {
+        player.vy = -10;
+        player.grounded = false;
+      }
+    });
+
+    document.addEventListener('keyup', (e) => keys[e.key] = false);
+
+    update();
+  </script>
+</body>
+</html>
